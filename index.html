@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>爆旋陀螺：故事閱讀大冒險</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Canvas Confetti for Fireworks -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    window.FirebaseSDK = {
+      initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+      getFirestore, doc, setDoc, getDoc, collection, onSnapshot
+    };
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
+      color: #fff;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    .font-game {
+      font-family: 'Chakra Petch', 'Noto Sans TC', sans-serif;
+    }
+
+    /* Glow & Sparkle Effects */
+    .glow-bell {
+      animation: bellGlow 1.5s infinite alternate;
+    }
+    @keyframes bellGlow {
+      0% { transform: scale(1) rotate(-5deg); filter: drop-shadow(0 0 4px #fbbf24); }
+      100% { transform: scale(1.15) rotate(5deg); filter: drop-shadow(0 0 15px #f59e0b); }
+    }
+
+    .sparkle-bg {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .beyblade-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .beyblade-card:hover:not(.locked) {
+      transform: translateY(-5px) scale(1.02);
+      box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.5);
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3b82f6;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col sparkle-bg">
+
+  <!-- Header / Navigation Bar -->
+  <header class="w-full glass-card sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b border-slate-700">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-xl shadow-lg">
+        🌀
+      </div>
+      <div>
+        <h1 class="text-lg md:text-xl font-black font-game text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-300">
+          爆旋陀螺：故事對決大冒險
+        </h1>
+        <p id="userInfoDisplay" class="text-xs text-slate-400 font-mono">未登入</p>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="flex items-center gap-4">
+      <!-- Audio Toggle Button -->
+      <button id="audioBtn" onclick="toggleAudio()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-semibold flex items-center gap-2 transition">
+        <i id="audioIcon" class="fas font-solid fa-volume-up text-cyan-400"></i>
+        <span id="audioText" class="hidden sm:inline">音樂: 開</span>
+      </button>
+
+      <!-- Teacher Bell Icon (Secret Door) -->
+      <button onclick="openSecretModal()" title="教師管理面板" class="glow-bell p-2 text-amber-400 hover:text-amber-300 transition text-2xl focus:outline-none">
+        <i class="fas fa-bell"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dynamic Container -->
+  <main id="appContainer" class="flex-1 max-w-6xl w-full mx-auto p-4 flex flex-col justify-center">
+
+    <!-- 1. LOGIN SCREEN -->
+    <section id="loginScreen" class="glass-card max-w-md w-full mx-auto p-8 rounded-2xl border border-cyan-500/30 text-center shadow-2xl">
+      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-600/20 border-2 border-cyan-400 flex items-center justify-center text-4xl animate-bounce">
+        🌀
+      </div>
+      <h2 class="text-2xl font-black mb-2 text-cyan-300 font-game">準備發射！選手登入</h2>
+      <p class="text-slate-400 text-sm mb-6">請輸入你的班別與學號以記錄對戰功績</p>
+
+      <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">班別 (Class)</label>
+          <input type="text" id="inputClass" required placeholder="例如: 1A / 3B" class="w-full px-4 py-3 rounded-xl bg-slate-900/80 border border-slate-700 focus:border-cyan-400 focus:outline-none text-white transition">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">學號 (Class No.)</label>
+          <input type="number" id="inputNo" required min="1" max="50" placeholder="例如: 05 / 12" class="w-full px-4 py-3 rounded-xl bg-slate-900/80 border border-slate-700 focus:border-cyan-400 focus:outline-none text-white transition">
+        </div>
+        <button type="submit" class="w-full py-3.5 rounded-xl font-bold font-game bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-900 text-lg shadow-lg shadow-cyan-500/30 transition transform hover:-translate-y-0.5 active:translate-y-0">
+          開始進入戰場 <i class="fas fa-play ml-2"></i>
+        </button>
+      </form>
+    </section>
+
+    <!-- 2. INSTRUCTIONS MODAL/SCREEN -->
+    <section id="introScreen" class="hidden glass-card max-w-2xl w-full mx-auto p-8 rounded-2xl border border-blue-500/30 text-left relative">
+      <h2 class="text-2xl font-black text-cyan-300 font-game mb-4 flex items-center gap-2">
+        <i class="fas fa-book-open text-cyan-400"></i> 爆旋陀螺對決說明
+      </h2>
+
+      <div class="space-y-4 text-slate-200 text-sm leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+          <h3 class="font-bold text-amber-400 mb-1">🏆 勝利規則 (先取 4 分獲勝)</h3>
+          <ul class="list-disc list-inside space-y-1 text-slate-300">
+            <li><span class="text-red-400 font-bold">極限勝利：3分</span> (將對手擊飛至極限區域)</li>
+            <li><span class="text-amber-400 font-bold">爆裂勝利：2分</span> (將對手陀螺擊至解體)</li>
+            <li><span class="text-blue-400 font-bold">擊飛勝利：2分</span> (將對手擊出場外)</li>
+            <li><span class="text-green-400 font-bold">迴旋勝利：1分</span> (持久旋轉勝出)</li>
+          </ul>
+        </div>
+
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+          <h3 class="font-bold text-cyan-400 mb-1">🌀 陀螺解鎖與戰力</h3>
+          <p>解答故事問題可以解鎖更強大的傳說爆旋陀螺：</p>
+          <ul class="list-disc list-inside space-y-1 text-slate-300 mt-1">
+            <li><span class="text-emerald-400 font-semibold">初始可選</span>：薯片龍、暴龍 (慢速旋轉)</li>
+            <li><span class="text-blue-400 font-semibold">答對 4 題解鎖</span>：鯊魚、鳳凰 (快速旋轉)</li>
+            <li><span class="text-purple-400 font-semibold">答對 8 題解鎖</span>：神杖、天馬、鈷藍龍 (超快速＋火花特效✨)</li>
+          </ul>
+        </div>
+
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+          <h3 class="font-bold text-indigo-400 mb-1">🎯 第五局終極挑戰</h3>
+          <p>贏得 5 局對決即獲勝！<span class="text-amber-300 font-bold">第 5 局前必須答對全部 12 題問題</span>才能開啟最終勝局。</p>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end gap-3">
+        <button onclick="startGameFromIntro()" class="px-8 py-3 rounded-xl font-bold font-game bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 hover:brightness-110 shadow-lg shadow-cyan-500/20 transition">
+          略過說明 / 開始遊戲 <i class="fas fa-forward ml-1"></i>
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. MAIN GAME DASHBOARD & ARENA -->
+    <section id="gameDashboard" class="hidden flex flex-col gap-6">
+      
+      <!-- Top Status Banner -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="glass-card p-3 rounded-xl flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg">🏆</div>
+          <div>
+            <div class="text-xs text-slate-400">當前勝局</div>
+            <div id="winCountDisplay" class="text-lg font-black font-game text-amber-300">0 / 5 局</div>
+          </div>
+        </div>
+
+        <div class="glass-card p-3 rounded-xl flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">📚</div>
+          <div>
+            <div class="text-xs text-slate-400">閱讀解題</div>
+            <div id="quizProgressDisplay" class="text-lg font-black font-game text-emerald-300">0 / 12 題</div>
+          </div>
+        </div>
+
+        <div class="glass-card p-3 rounded-xl flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-lg">⚡</div>
+          <div>
+            <div class="text-xs text-slate-400">解鎖陀螺數</div>
+            <div id="unlockedBeysDisplay" class="text-lg font-black font-game text-cyan-300">2 / 7 個</div>
+          </div>
+        </div>
+
+        <div class="glass-card p-3 rounded-xl flex items-center gap-3">
+          <button onclick="openQuestionModal()" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs font-game transition shadow-md flex items-center justify-center gap-2">
+            <i class="fas fa-edit"></i> 答題解鎖更多陀螺
+          </button>
+        </div>
+      </div>
+
+      <!-- Beyblade Selection Carousel / Grid -->
+      <div class="glass-card p-5 rounded-2xl border border-slate-700">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-cyan-300 font-game flex items-center gap-2">
+            <i class="fas fa-shield-alt"></i> 選擇你的爆旋陀螺 (Your Beyblade)
+          </h3>
+          <span class="text-xs text-slate-400">點擊已解鎖陀螺即可選定</span>
+        </div>
+
+        <div id="beyGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          <!-- Dynamically populated Beyblade Cards -->
+        </div>
+      </div>
+
+      <!-- Arena Canvas Section -->
+      <div class="glass-card p-4 rounded-2xl border border-slate-700 relative overflow-hidden flex flex-col items-center">
+        <!-- Match Score Bar -->
+        <div class="w-full flex items-center justify-between px-4 py-2 bg-slate-900/80 rounded-xl mb-4 border border-slate-800 font-game">
+          <div class="flex items-center gap-2">
+            <span class="text-cyan-400 font-bold text-sm" id="playerBeyName">薯片龍</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">玩家</span>
+          </div>
+          <div class="text-xl font-black tracking-widest text-amber-400">
+            <span id="playerMatchScore">0</span> <span class="text-slate-600">:</span> <span id="cpuMatchScore">0</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800">電腦</span>
+            <span class="text-red-400 font-bold text-sm" id="cpuBeyName">強勁暴龍</span>
+          </div>
+        </div>
+
+        <!-- Canvas Arena Container -->
+        <div class="relative w-full max-w-xl aspect-square rounded-full border-4 border-slate-700/80 shadow-2xl overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-950">
+          <canvas id="arenaCanvas" class="w-full h-full block"></canvas>
+
+          <!-- Arena Overlay Announcement -->
+          <div id="arenaOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6 transition-all">
+            <h3 id="overlayTitle" class="text-3xl font-black font-game text-amber-300 mb-2">準備對決！</h3>
+            <p id="overlayDesc" class="text-sm text-slate-300 mb-6 max-w-xs">點擊下方按鈕啟動 3, 2, 1 爆旋發射！</p>
+            <button id="launchBtn" onclick="launchBattle()" class="px-8 py-3.5 rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 font-black font-game text-lg shadow-xl shadow-amber-500/20 transform hover:scale-105 active:scale-95 transition">
+              3, 2, 1 GO SHOOT! 🚀
+            </button>
+          </div>
+        </div>
+
+        <div id="battleLog" class="mt-3 text-xs text-slate-400 font-mono h-6 text-center">
+          準備就緒，等待發射...
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- QUESTION MODAL -->
+  <div id="questionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-xl w-full p-6 rounded-2xl border border-cyan-500/30 flex flex-col max-h-[90vh]">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <h3 class="text-lg font-bold font-game text-cyan-300 flex items-center gap-2">
+          <i class="fas fa-graduation-cap"></i> 閱讀理解答題解鎖 (故事試煉)
+        </h3>
+        <button onclick="closeQuestionModal()" class="text-slate-400 hover:text-white text-xl">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Question Selector Bar -->
+      <div class="flex gap-1.5 overflow-x-auto py-3 my-1 border-b border-slate-800" id="qNumNav">
+        <!-- Question Tabs Q1..Q12 -->
+      </div>
+
+      <!-- Main Question Body -->
+      <div class="flex-1 overflow-y-auto py-4 space-y-4">
+        <div id="qTextDisplay" class="text-base font-bold text-slate-100 leading-snug">
+          題目加載中...
+        </div>
+
+        <div id="optionsContainer" class="space-y-2.5">
+          <!-- Option Buttons dynamically inserted -->
+        </div>
+
+        <!-- Hint Box for wrong answers -->
+        <div id="hintBox" class="hidden p-3 rounded-xl bg-amber-950/60 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2">
+          <i class="fas fa-lightbulb text-amber-400 mt-0.5 text-base"></i>
+          <div>
+            <span class="font-bold">解題提示：</span>
+            <span id="hintText">提示內容...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-3 border-t border-slate-700 flex justify-between items-center text-xs text-slate-400">
+        <span id="qStatusBadge">狀態：未解答</span>
+        <button onclick="closeQuestionModal()" class="px-5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition">
+          返回戰場
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEACHER / SECRET ADMIN MODAL (LKM) -->
+  <div id="secretModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-4xl w-full p-6 rounded-2xl border border-amber-500/40 max-h-[90vh] flex flex-col">
+      
+      <!-- Password Lock Screen -->
+      <div id="teacherLockScreen" class="py-8 text-center space-y-4">
+        <div class="w-16 h-16 mx-auto rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl">
+          <i class="fas fa-lock"></i>
+        </div>
+        <h3 class="text-xl font-bold font-game text-amber-300">教師管理及數據分析面板</h3>
+        <p class="text-xs text-slate-400">請輸入解鎖密碼以存取學生答題記錄與數據分析</p>
+
+        <div class="max-w-xs mx-auto space-y-3">
+          <input type="password" id="teacherPassword" placeholder="輸入密碼..." class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-center text-white focus:border-amber-400 focus:outline-none font-mono">
+          <button onclick="verifyTeacherPassword()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold font-game transition">
+            驗證身份解鎖 <i class="fas fa-key ml-1"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Teacher Dashboard Content (Hidden until unlocked) -->
+      <div id="teacherDashboard" class="hidden flex-1 flex flex-col min-h-0 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+          <div>
+            <h3 class="text-lg font-bold font-game text-amber-300 flex items-center gap-2">
+              <i class="fas fa-chart-bar"></i> 班級答題數據與分析面板
+            </h3>
+            <span class="text-xs text-slate-400 font-mono">雲端資料庫 Excel 檔名: homework-66b86</span>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="exportToExcel()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition">
+              <i class="fas fa-file-excel"></i> 匯出 EXCEL (homework-66b86)
+            </button>
+            <button onclick="closeSecretModal()" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs hover:text-white">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950/60 p-2">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-900 text-slate-300 border-b border-slate-800">
+                <th class="p-2 font-bold">班別</th>
+                <th class="p-2 font-bold">學號</th>
+                <th class="p-2 font-bold">首答正確數</th>
+                <th class="p-2 font-bold">最終正確數</th>
+                <th class="p-2 font-bold">勝局數</th>
+                <th class="p-2 font-bold">答對/答錯詳細記錄 (首答鎖定)</th>
+              </tr>
+            </thead>
+            <tbody id="teacherTableBody" class="divide-y divide-slate-800 text-slate-300 font-mono">
+              <!-- Dynamically populated from Firestore -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pedagogical Knowledge Analysis -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-xs space-y-2">
+          <h4 class="font-bold text-amber-400">📊 每題知識層面與常見誤因分析指引：</h4>
+          <p class="text-slate-400">1-4題（訊息提取）：容易因粗心忽視文本細節；5-8題（推論分析）：對人物動機或意圖理解不深刻；9-12題（價值情意與延伸）：缺乏將故事主題連結至現實生活處事精神的能力。</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FIREWORKS / WIN MODAL -->
+  <div id="winModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-lg z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-lg w-full p-8 rounded-3xl border-2 border-yellow-400 text-center space-y-6 shadow-2xl relative overflow-hidden">
+      <div class="w-24 h-24 mx-auto rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 text-slate-950 flex items-center justify-center text-5xl shadow-xl shadow-amber-500/40 animate-pulse">
+        👑
+      </div>
+      <div>
+        <h2 class="text-3xl font-black font-game text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 mb-2">
+          大獲全勝！故事陀螺王！
+        </h2>
+        <p class="text-slate-300 text-sm">恭喜你順利贏得 5 局陀螺對決，並成功挑戰全部 12 題故事試煉！</p>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-slate-900/80 border border-amber-500/30 text-left space-y-2 text-xs">
+        <div class="flex justify-between text-slate-300">
+          <span>玩家成績：</span>
+          <span id="winUserDetail" class="font-bold text-amber-300">1A (01)</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+          <span>總完成對決：</span>
+          <span class="font-bold text-emerald-400">5 局 勝利</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+          <span>故事理解測試：</span>
+          <span class="font-bold text-cyan-400">12 / 12 題 完全答對</span>
+        </div>
+      </div>
+
+      <button onclick="location.reload()" class="w-full py-3.5 rounded-xl font-bold font-game bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-base shadow-lg shadow-amber-500/30 transition hover:brightness-110">
+        再次挑戰 / 重新開始 🔄
+      </button>
+    </div>
+  </div>
+
+  <!-- GAME LOGIC SCRIPT -->
+  <script>
+    /* ==========================================================================
+       1. DATA DEFINITIONS (BEYBLADES & QUESTIONS)
+       ========================================================================== */
+    const BEYBLADES = [
+      { id: 'crispDragon', name: '薯片龍', type: '慢速', speed: 1.2, atk: 45, def: 50, weight: 40, color: '#f59e0b', spark: false, reqCorrect: 0 },
+      { id: 'rex', name: '暴龍', type: '慢速', speed: 1.3, atk: 52, def: 42, weight: 45, color: '#ef4444', spark: false, reqCorrect: 0 },
+      { id: 'shark', name: '鯊魚', type: '快速', speed: 2.2, atk: 75, def: 60, weight: 65, color: '#06b6d4', spark: false, reqCorrect: 4 },
+      { id: 'phoenix', name: '鳳凰', type: '快速', speed: 2.4, atk: 78, def: 68, weight: 62, color: '#f43f5e', spark: false, reqCorrect: 4 },
+      { id: 'scepter', name: '神杖', type: '超快速', speed: 3.5, atk: 92, def: 85, weight: 88, color: '#eab308', spark: true, reqCorrect: 8 },
+      { id: 'pegasus', name: '天馬', type: '超快速', speed: 3.6, atk: 95, def: 82, weight: 85, color: '#3b82f6', spark: true, reqCorrect: 8 },
+      { id: 'cobaltDragon', name: '鈷藍龍', type: '超快速', speed: 3.8, atk: 98, def: 90, weight: 92, color: '#6366f1', spark: true, reqCorrect: 8 }
+    ];
+
+    // Official Questions from Word Doc
+    const QUESTIONS = [
+      {
+        id: 1,
+        question: "1. 洋洋升上幾年級？",
+        options: ["A. 幼稚園", "B. 一年級", "C. 二年級", "D. 三年級"],
+        answer: "B",
+        hint: "文本開頭提到洋洋剛剛離開幼稚園，正式成為一名「一年級」的小學生哦！",
+        dimension: "訊息提取",
+        reason: "忽視故事開頭細節"
+      },
+      {
+        id: 2,
+        question: "2. 洋洋一開始對上學的感覺是怎樣的？",
+        options: ["A. 很害怕", "B. 很無聊", "C. 很生氣", "D. 很開心，歡迎新挑戰"],
+        answer: "D",
+        hint: "請回想故事一開始，洋洋背起新書包時是充滿期待與笑容的！",
+        dimension: "訊息提取",
+        reason: "未能準確識別主角初始情緒"
+      },
+      {
+        id: 3,
+        question: "3. 洋洋的書包裡出現了什麼東西，讓他很困擾？",
+        options: ["A. 一隻作業怪獸", "B. 一個玩具", "C. 一本故事書", "D. 一枝新鉛筆"],
+        answer: "A",
+        hint: "這隻特別的「怪獸」隨著作業變多而出現，給洋洋帶來很大負擔。",
+        dimension: "訊息提取",
+        reason: "誤解故事中的象徵物"
+      },
+      {
+        id: 4,
+        question: "4. 作業怪獸出現後，洋洋變成怎樣？",
+        options: [
+          "A. 更喜歡跟媽媽聊天",
+          "B. 更喜歡做功課",
+          "C. 每天都開開心心",
+          "D. 不想跟媽媽說話，也不想跟爸爸去公園玩"
+        ],
+        answer: "D",
+        hint: "作業怪獸讓洋洋心情變得沉重，甚至連平常喜歡的休閒活動都不想參與了。",
+        dimension: "推論分析",
+        reason: "忽視情緒對行為產生的影響"
+      },
+      {
+        id: 5,
+        question: "5. 為了對付作業怪獸，老師變成怎樣？",
+        options: ["A. 笑咪咪", "B. 變得嚴肅", "C. 不來上課", "D. 跟洋洋一起玩"],
+        answer: "B",
+        hint: "老師為了督促大家打敗作業怪獸，在課堂上展現出了嚴格的一面。",
+        dimension: "訊息提取",
+        reason: "混淆角色在不同情境的態度"
+      },
+      {
+        id: 6,
+        question: "6. 誰幫助洋洋對付作業怪獸？",
+        options: ["A. 同學", "B. 爸爸", "C. 媽媽", "D. 老師"],
+        answer: "C",
+        hint: "回到家後，是細心的「媽媽」發現了洋洋的困擾並用心引導他。",
+        dimension: "訊息提取",
+        reason: "未能記清核心支援角色"
+      },
+      {
+        id: 7,
+        question: "7. 媽媽用什麼方法幫助洋洋？",
+        options: [
+          "A. 罵他寫功課",
+          "B. 用他喜歡的事物（例如打棒球的姿勢）來幫助他",
+          "C. 替他寫完所有功課",
+          "D. 不讓他去學校"
+        ],
+        answer: "B",
+        hint: "媽媽結合了洋洋最喜歡的運動，把寫字姿勢比喻成棒球揮棒哦！",
+        dimension: "推論分析",
+        reason: "忽略教育方法之趣味性細節"
+      },
+      {
+        id: 8,
+        question: "8. 故事想告訴我們，面對困難時應該怎樣？",
+        options: ["A. 正面迎接挑戰", "B. 逃跑", "C. 哭不停", "D. 不理它"],
+        answer: "A",
+        hint: "洋洋最後明白，逃避不能解決問題，唯有積極面對才能克服！",
+        dimension: "主旨推論",
+        reason: "對文章核心主題理解不夠全面"
+      },
+      {
+        id: 9,
+        question: "9. 最後洋洋對做功課的感覺怎樣？",
+        options: [
+          "A. 仍然很害怕",
+          "B. 更討厭功課",
+          "C. 不再害怕，功課不再是怪獸",
+          "D. 不想上學了"
+        ],
+        answer: "C",
+        hint: "經過練習與媽媽的陪伴，洋洋發現功課其實沒那麼可怕了！",
+        dimension: "情感轉變分析",
+        reason: "未能把握角色前後轉變"
+      },
+      {
+        id: 10,
+        question: "10. 這個故事最主要教我們什麼？",
+        options: [
+          "A. 功課很可怕",
+          "B. 老師很兇",
+          "C. 不要寫功課",
+          "D. 要用正面態度克服困難，家人會陪伴我們"
+        ],
+        answer: "D",
+        hint: "故事強調了堅毅態度以及家人溫暖陪伴的重要性。",
+        dimension: "主旨總結",
+        reason: "過度關注負面局部情節"
+      },
+      {
+        id: 11,
+        question: "11. 如果你做功課時遇到不會的題目，覺得好難，你應該怎樣做？",
+        options: [
+          "A. 立刻放棄，不寫了",
+          "B. 哭著找媽媽代寫",
+          "C. 先試一試，不懂就問老師或家人，再繼續努力",
+          "D. 把功課丟掉"
+        ],
+        answer: "C",
+        hint: "遇到困難時，嘗試與尋求正當協助才是積極的好方法。",
+        dimension: "情意延伸應用",
+        reason: "缺乏解決問題的堅毅態度"
+      },
+      {
+        id: 12,
+        question: "12. 如果你學騎單車或學新東西時，跌倒了或做得不好，怎樣才是有堅毅精神？",
+        options: [
+          "A. 說「我永遠都不會」然後不學了",
+          "B. 再試一次，慢慢練習，不輕易放棄",
+          "C. 生氣地把單車踢走",
+          "D. 只看別人做，自己不試"
+        ],
+        answer: "B",
+        hint: "「堅毅」代表著不怕失敗，願意一試再試直到成功！",
+        dimension: "情意延伸應用",
+        reason: "對「堅毅」精神定義理解偏差"
+      }
+    ];
+
+    /* ==========================================================================
+       2. GLOBAL APP STATE & FIREBASE INITIALIZATION
+       ========================================================================== */
+    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'homework-66b86';
+    
+    let state = {
+      userClass: '',
+      userNo: '',
+      userId: '',
+      selectedBey: BEYBLADES[0],
+      wins: 0,
+      currentMatchPlayerScore: 0,
+      currentMatchCpuScore: 0,
+      
+      // Question Progress
+      // qRecords: { qId: { firstAttempt: 'A', isFirstCorrect: true/false, currentAnswer: 'B', isResolved: true/false } }
+      qRecords: {},
+      currentQIndex: 0,
+
+      // Audio Status
+      audioEnabled: true
+    };
+
+    let db = null, auth = null;
+    let teacherUnlocked = false;
+
+    // Web Audio Context & Sounds
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playTone(freq, duration = 0.1, type = 'sine') {
+      if (!state.audioEnabled) return;
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e){}
+    }
+
+    function playCollisionSound() {
+      playTone(180, 0.08, 'sawtooth');
+    }
+
+    function playWinSound() {
+      if (!state.audioEnabled) return;
+      [300, 400, 500, 600, 800].forEach((f, i) => {
+        setTimeout(() => playTone(f, 0.15, 'triangle'), i * 100);
+      });
+    }
+
+    function toggleAudio() {
+      state.audioEnabled = !state.audioEnabled;
+      document.getElementById('audioIcon').className = state.audioEnabled ? "fas fa-volume-up text-cyan-400" : "fas fa-volume-mute text-slate-500";
+      document.getElementById('audioText').innerText = state.audioEnabled ? "音樂: 開" : "音樂: 關";
+    }
+
+    // Initialize Firebase Setup
+    async function initFirebase() {
+      try {
+        if (typeof __firebase_config !== 'undefined' && window.FirebaseSDK) {
+          const config = JSON.parse(__firebase_config);
+          const app = window.FirebaseSDK.initializeApp(config);
+          auth = window.FirebaseSDK.getAuth(app);
+          db = window.FirebaseSDK.getFirestore(app);
+
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await window.FirebaseSDK.signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await window.FirebaseSDK.signInAnonymously(auth);
+          }
+
+          console.log("Firebase Connected");
+          setupRealtimeSync();
+        }
+      } catch(e) {
+        console.warn("Firebase initialized in fallback offline mode", e);
+      }
+    }
+
+    /* ==========================================================================
+       3. USER LOGIN & DATA SYNC
+       ========================================================================== */
+    function handleLogin(e) {
+      e.preventDefault();
+      const cls = document.getElementById('inputClass').value.trim().toUpperCase();
+      const no = document.getElementById('inputNo').value.trim();
+
+      if (!cls || !no) return;
+
+      state.userClass = cls;
+      state.userNo = no.padStart(2, '0');
+      state.userId = `${state.userClass}_${state.userNo}`;
+
+      document.getElementById('userInfoDisplay').innerText = `選手: ${state.userClass} 班 (${state.userNo}號)`;
+
+      // Switch screen
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('introScreen').classList.remove('hidden');
+
+      syncDataToCloud();
+    }
+
+    function startGameFromIntro() {
+      document.getElementById('introScreen').classList.add('hidden');
+      document.getElementById('gameDashboard').classList.remove('hidden');
+      renderBeyGrid();
+      renderArena();
+    }
+
+    async function syncDataToCloud() {
+      if (!db || !state.userId) return;
+
+      const userDocRef = window.FirebaseSDK.doc(
+        db, 'artifacts', APP_ID, 'public', 'data', 'students', state.userId
+      );
+
+      const payload = {
+        userClass: state.userClass,
+        userNo: state.userNo,
+        wins: state.wins,
+        qRecords: state.qRecords,
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await window.FirebaseSDK.setDoc(userDocRef, payload, { merge: true });
+      } catch(err) {
+        console.error("Firestore sync error:", err);
+      }
+    }
+
+    function setupRealtimeSync() {
+      if (!db) return;
+      const colRef = window.FirebaseSDK.collection(db, 'artifacts', APP_ID, 'public', 'data', 'students');
+
+      window.FirebaseSDK.onSnapshot(colRef, (snapshot) => {
+        if (teacherUnlocked) {
+          renderTeacherTable(snapshot);
+        }
+      }, (err) => {
+        console.error("Snapshot listener error:", err);
+      });
+    }
+
+    /* ==========================================================================
+       4. BEYBLADE SELECTION & UNLOCK LOGIC
+       ========================================================================== */
+    function getResolvedCorrectCount() {
+      return Object.values(state.qRecords).filter(r => r.isResolved).length;
+    }
+
+    function renderBeyGrid() {
+      const solvedCount = getResolvedCorrectCount();
+      const grid = document.getElementById('beyGrid');
+      grid.innerHTML = '';
+
+      document.getElementById('quizProgressDisplay').innerText = `${solvedCount} / 12 題`;
+
+      let unlockedCount = 0;
+
+      BEYBLADES.forEach(bey => {
+        const isUnlocked = solvedCount >= bey.reqCorrect;
+        if (isUnlocked) unlockedCount++;
+
+        const isSelected = state.selectedBey.id === bey.id;
+
+        const card = document.createElement('div');
+        card.className = `beyblade-card p-3 rounded-xl flex flex-col items-center text-center cursor-pointer relative border ${
+          isSelected 
+            ? 'bg-blue-900/60 border-cyan-400 shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400' 
+            : isUnlocked 
+              ? 'bg-slate-900/70 border-slate-700 hover:border-slate-500' 
+              : 'bg-slate-950/80 border-slate-800 opacity-60 locked'
+        }`;
+
+        card.onclick = () => {
+          if (!isUnlocked) {
+            alert(`該陀螺需答對 ${bey.reqCorrect} 題解鎖！(當前答對 ${solvedCount} 題)`);
+            return;
+          }
+          state.selectedBey = bey;
+          document.getElementById('playerBeyName').innerText = bey.name;
+          renderBeyGrid();
+        };
+
+        card.innerHTML = `
+          <!-- Spinning Preview Icon -->
+          <div class="w-12 h-12 rounded-full border-2 border-slate-600 flex items-center justify-center text-2xl mb-2 relative overflow-hidden" style="background: radial-gradient(circle, ${bey.color} 30%, #0f172a 90%);">
+            🌀
+            ${bey.spark ? '<span class="absolute text-xs top-0 right-0">✨</span>' : ''}
+          </div>
+
+          <div class="font-bold text-xs font-game mb-1 text-slate-100">${bey.name}</div>
+          
+          <div class="text-[10px] px-1.5 py-0.5 rounded ${
+            bey.type === '慢速' ? 'bg-emerald-950 text-emerald-300' :
+            bey.type === '快速' ? 'bg-blue-950 text-blue-300' : 'bg-purple-950 text-purple-300'
+          } mb-2">${bey.type}</div>
+
+          <!-- Attributes -->
+          <div class="w-full text-[10px] space-y-0.5 font-mono text-slate-400 border-t border-slate-800/80 pt-1">
+            <div class="flex justify-between"><span>攻</span><span class="text-slate-200">${bey.atk}</span></div>
+            <div class="flex justify-between"><span>防</span><span class="text-slate-200">${bey.def}</span></div>
+            <div class="flex justify-between"><span>重</span><span class="text-slate-200">${bey.weight}</span></div>
+          </div>
+
+          ${!isUnlocked ? `
+            <div class="absolute inset-0 bg-slate-950/80 rounded-xl flex flex-col items-center justify-center p-1 text-amber-400">
+              <i class="fas fa-lock text-base mb-1"></i>
+              <span class="text-[9px] font-bold">需答對 ${bey.reqCorrect} 題</span>
+            </div>
+          ` : ''}
+        `;
+
+        grid.appendChild(card);
+      });
+
+      document.getElementById('unlockedBeysDisplay').innerText = `${unlockedCount} / ${BEYBLADES.length} 個`;
+    }
+
+    /* ==========================================================================
+       5. BATTLE SIMULATION & CANVAS ARENA
+       ========================================================================== */
+    let canvas, ctx;
+    let battleAnimId = null;
+
+    function renderArena() {
+      canvas = document.getElementById('arenaCanvas');
+      ctx = canvas.getContext('2d');
+      
+      // Auto Adjust Canvas Size
+      canvas.width = 500;
+      canvas.height = 500;
+
+      drawStaticArena();
+    }
+
+    function drawStaticArena() {
+      if (!ctx) return;
+      const w = canvas.width, h = canvas.height;
+      const center = w / 2;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Outer Stadium Ring
+      ctx.beginPath();
+      ctx.arc(center, center, 230, 0, Math.PI * 2);
+      ctx.fillStyle = '#1e293b';
+      ctx.fill();
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = '#334155';
+      ctx.stroke();
+
+      // Battle Zone Inner Dish
+      const grad = ctx.createRadialGradient(center, center, 20, center, center, 210);
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(0.8, '#1e293b');
+      grad.addColorStop(1, '#090d16');
+
+      ctx.beginPath();
+      ctx.arc(center, center, 210, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Arena lines
+      ctx.beginPath();
+      ctx.arc(center, center, 140, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(center, center, 70, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(244, 63, 94, 0.2)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function launchBattle() {
+      // Check condition for Round 5
+      if (state.wins === 4) {
+        const solvedCount = getResolvedCorrectCount();
+        if (solvedCount < 12) {
+          alert(`💥 第五局終極對決鎖定中！\n你必須回答正確全部 12 題問題（當前已對 ${solvedCount}/12 題）才能挑戰第五局獲勝！`);
+          openQuestionModal();
+          return;
+        }
+      }
+
+      document.getElementById('arenaOverlay').classList.add('hidden');
+      
+      // Select CPU Beyblade based on round strength
+      const cpuOptions = state.wins >= 3 
+        ? BEYBLADES.filter(b => b.reqCorrect >= 4) 
+        : BEYBLADES.slice(0, 4);
+      const cpuBey = cpuOptions[Math.floor(Math.random() * cpuOptions.length)];
+      document.getElementById('cpuBeyName').innerText = cpuBey.name;
+
+      const playerBey = state.selectedBey;
+
+      // Battle Duration: Random 2.0 to 4.0 seconds
+      const durationMs = 2000 + Math.random() * 2000;
+      const startTime = performance.now();
+
+      // Initial positions & velocity
+      let p = {
+        x: 160, y: 250,
+        vx: (2 + playerBey.speed) * 1.5, vy: (Math.random() - 0.5) * 4,
+        color: playerBey.color,
+        spark: playerBey.spark,
+        radius: 22,
+        angle: 0,
+        speedMultiplier: playerBey.speed
+      };
+
+      let c = {
+        x: 340, y: 250,
+        vx: -(2 + cpuBey.speed) * 1.5, vy: (Math.random() - 0.5) * 4,
+        color: cpuBey.color,
+        spark: cpuBey.spark,
+        radius: 22,
+        angle: 0,
+        speedMultiplier: cpuBey.speed
+      };
+
+      let sparks = [];
+
+      function animateBattle(time) {
+        const elapsed = time - startTime;
+        ctx.clearRect(0, 0, 500, 500);
+        drawStaticArena();
+
+        // Gravitate towards center
+        const center = 250;
+        p.vx += (center - p.x) * 0.005;
+        p.vy += (center - p.y) * 0.005;
+        c.vx += (center - c.x) * 0.005;
+        c.vy += (center - c.y) * 0.005;
+
+        // Move
+        p.x += p.vx; p.y += p.vy;
+        c.x += c.vx; c.y += c.vy;
+
+        p.angle += 0.3 * p.speedMultiplier;
+        c.angle -= 0.3 * c.speedMultiplier;
+
+        // Collision Check
+        const dx = c.x - p.x;
+        const dy = c.y - p.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist < p.radius + c.radius) {
+          playCollisionSound();
+
+          // Elastic bounce
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const kx = p.vx - c.vx;
+          const ky = p.vy - c.vy;
+          const p2 = 2 * (nx * kx + ny * ky) / 2;
+
+          p.vx -= p2 * nx * 1.2;
+          p.vy -= p2 * ny * 1.2;
+          c.vx += p2 * nx * 1.2;
+          c.vy += p2 * ny * 1.2;
+
+          // Generate Sparks if enabled
+          if (p.spark || c.spark) {
+            for (let i = 0; i < 12; i++) {
+              sparks.push({
+                x: (p.x + c.x) / 2,
+                y: (p.y + c.y) / 2,
+                vx: (Math.random() - 0.5) * 8,
+                vy: (Math.random() - 0.5) * 8,
+                life: 1.0,
+                color: Math.random() > 0.5 ? '#f59e0b' : '#ef4444'
+              });
+            }
+          }
+        }
+
+        // Draw Sparks
+        sparks.forEach((s, idx) => {
+          s.x += s.vx; s.y += s.vy; s.life -= 0.05;
+          if (s.life <= 0) sparks.splice(idx, 1);
+          else {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 2.5 * s.life, 0, Math.PI * 2);
+            ctx.fillStyle = s.color;
+            ctx.fill();
+          }
+        });
+
+        // Draw Beyblades
+        drawBey(p);
+        drawBey(c);
+
+        if (elapsed < durationMs) {
+          battleAnimId = requestAnimationFrame(animateBattle);
+        } else {
+          finishRound(p, c, playerBey, cpuBey);
+        }
+      }
+
+      battleAnimId = requestAnimationFrame(animateBattle);
+    }
+
+    function drawBey(b) {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+
+      // Outer Layer
+      ctx.beginPath();
+      ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
+      ctx.fillStyle = b.color;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      // Blades / Teeth
+      for (let i = 0; i < 3; i++) {
+        ctx.rotate((Math.PI * 2) / 3);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(b.radius - 6, -3, 8, 6);
+      }
+
+      // Core Symbol
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function finishRound(p, c, playerBey, cpuBey) {
+      // Determine win type
+      const victoryTypes = [
+        { name: '極限勝利！', pts: 3, text: '將對手猛烈擊飛至極限區！' },
+        { name: '爆裂勝利！', pts: 2, text: '徹底破壞對手鎖點擊至爆裂！' },
+        { name: '擊飛勝利！', pts: 2, text: '成功將對手擊出場外！' },
+        { name: '迴旋勝利！', pts: 1, text: '以強韌持久力迴旋勝出！' }
+      ];
+
+      // Calculate player bias based on stats
+      const playerPower = playerBey.atk + playerBey.def + playerBey.weight;
+      const cpuPower = cpuBey.atk + cpuBey.def + cpuBey.weight;
+      const winChance = playerPower / (playerPower + cpuPower);
+
+      const playerWinsRound = Math.random() < winChance;
+      const vic = victoryTypes[Math.floor(Math.random() * victoryTypes.length)];
+
+      const log = document.getElementById('battleLog');
+
+      if (playerWinsRound) {
+        state.currentMatchPlayerScore += vic.pts;
+        playWinSound();
+        log.innerText = `💥 玩家 ${playerBey.name} 獲得 ${vic.name} (+${vic.pts}分)`;
+      } else {
+        state.currentMatchCpuScore += vic.pts;
+        log.innerText = `🛡️ 電腦 ${cpuBey.name} 獲得 ${vic.name} (+${vic.pts}分)`;
+      }
+
+      document.getElementById('playerMatchScore').innerText = state.currentMatchPlayerScore;
+      document.getElementById('cpuMatchScore').innerText = state.currentMatchCpuScore;
+
+      // Check Match Winner (First to 4 points)
+      if (state.currentMatchPlayerScore >= 4) {
+        state.wins++;
+        document.getElementById('winCountDisplay').innerText = `${state.wins} / 5 局`;
+        syncDataToCloud();
+
+        if (state.wins >= 5) {
+          showGrandVictoryModal();
+          return;
+        } else {
+          showRoundResultOverlay(`局制勝利！恭喜贏得第 ${state.wins} 局對決！`, `再接再厲，前往下一局！`);
+        }
+        resetMatchScores();
+      } else if (state.currentMatchCpuScore >= 4) {
+        showRoundResultOverlay(`本局遺憾落敗！`, `試試解鎖更強大的陀螺再戰！`);
+        resetMatchScores();
+      } else {
+        // Continue round
+        setTimeout(() => {
+          document.getElementById('arenaOverlay').classList.remove('hidden');
+          document.getElementById('overlayTitle').innerText = "下一回合！";
+          document.getElementById('overlayDesc').innerText = `當前比分 ${state.currentMatchPlayerScore} : ${state.currentMatchCpuScore}`;
+        }, 1200);
+      }
+    }
+
+    function resetMatchScores() {
+      state.currentMatchPlayerScore = 0;
+      state.currentMatchCpuScore = 0;
+      document.getElementById('playerMatchScore').innerText = "0";
+      document.getElementById('cpuMatchScore').innerText = "0";
+    }
+
+    function showRoundResultOverlay(title, desc) {
+      document.getElementById('arenaOverlay').classList.remove('hidden');
+      document.getElementById('overlayTitle').innerText = title;
+      document.getElementById('overlayDesc').innerText = desc;
+    }
+
+    function showGrandVictoryModal() {
+      document.getElementById('winModal').classList.remove('hidden');
+      document.getElementById('winUserDetail').innerText = `${state.userClass} 班 (${state.userNo} 號)`;
+
+      // Trigger Confetti / Fireworks
+      if (typeof confetti === 'function') {
+        const end = Date.now() + 3 * 1000;
+        (function frame() {
+          confetti({
+            particleCount: 5,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 }
+          });
+          confetti({
+            particleCount: 5,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 }
+          });
+          if (Date.now() < end) {
+            requestAnimationFrame(frame);
+          }
+        }());
+      }
+    }
+
+    /* ==========================================================================
+       6. STORY QUESTIONS & FIRST-ATTEMPT LOCK SYSTEM
+       ========================================================================== */
+    function openQuestionModal() {
+      document.getElementById('questionModal').classList.remove('hidden');
+      renderQuestionTabs();
+      loadQuestion(state.currentQIndex);
+    }
+
+    function closeQuestionModal() {
+      document.getElementById('questionModal').classList.add('hidden');
+      renderBeyGrid();
+    }
+
+    function renderQuestionTabs() {
+      const nav = document.getElementById('qNumNav');
+      nav.innerHTML = '';
+
+      QUESTIONS.forEach((q, idx) => {
+        const rec = state.qRecords[q.id];
+        let statusColor = "bg-slate-800 text-slate-400 border-slate-700";
+
+        if (rec) {
+          if (rec.isResolved) {
+            statusColor = "bg-emerald-950 text-emerald-300 border-emerald-600";
+          } else {
+            statusColor = "bg-amber-950 text-amber-300 border-amber-600";
+          }
+        }
+
+        const btn = document.createElement('button');
+        btn.className = `px-3 py-1.5 rounded-lg text-xs font-bold border whitespace-nowrap transition ${statusColor} ${
+          idx === state.currentQIndex ? 'ring-2 ring-cyan-400 scale-105' : ''
+        }`;
+        btn.innerText = `第 ${q.id} 題`;
+        btn.onclick = () => loadQuestion(idx);
+        nav.appendChild(btn);
+      });
+    }
+
+    function loadQuestion(idx) {
+      state.currentQIndex = idx;
+      renderQuestionTabs();
+
+      const q = QUESTIONS[idx];
+      document.getElementById('qTextDisplay').innerText = q.question;
+
+      const hintBox = document.getElementById('hintBox');
+      hintBox.classList.add('hidden');
+
+      const container = document.getElementById('optionsContainer');
+      container.innerHTML = '';
+
+      const rec = state.qRecords[q.id];
+      const statusBadge = document.getElementById('qStatusBadge');
+
+      if (rec) {
+        if (rec.isResolved) {
+          statusBadge.innerText = `狀態：已答對 (首答: ${rec.firstAttempt}${rec.isFirstCorrect ? '✓' : '✗'})`;
+          statusBadge.className = "text-emerald-400 font-bold";
+        } else {
+          statusBadge.innerText = `狀態：作答不正確 (首答鎖定: ${rec.firstAttempt})`;
+          statusBadge.className = "text-amber-400 font-bold";
+          document.getElementById('hintText').innerText = q.hint;
+          hintBox.classList.remove('hidden');
+        }
+      } else {
+        statusBadge.innerText = "狀態：未解答";
+        statusBadge.className = "text-slate-400";
+      }
+
+      const optionKeys = ["A", "B", "C", "D"];
+
+      q.options.forEach((optStr, oIdx) => {
+        const optKey = optionKeys[oIdx];
+        const optBtn = document.createElement('button');
+        
+        let btnStyle = "bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-slate-200";
+
+        if (rec && rec.isResolved && optKey === q.answer) {
+          btnStyle = "bg-emerald-900/60 border-emerald-500 text-emerald-200 font-bold";
+        }
+
+        optBtn.className = `w-full text-left p-3 rounded-xl border text-xs sm:text-sm transition flex items-center justify-between ${btnStyle}`;
+        optBtn.innerHTML = `<span>${optStr}</span>`;
+
+        optBtn.onclick = () => submitAnswer(q, optKey);
+        container.appendChild(optBtn);
+      });
+    }
+
+    function submitAnswer(q, selectedOpt) {
+      let rec = state.qRecords[q.id];
+      const isCorrect = selectedOpt === q.answer;
+
+      if (!rec) {
+        // First Attempt Lock
+        rec = {
+          firstAttempt: selectedOpt,
+          isFirstCorrect: isCorrect,
+          currentAnswer: selectedOpt,
+          isResolved: isCorrect
+        };
+      } else {
+        // Subsequent attempts only update current resolution
+        rec.currentAnswer = selectedOpt;
+        if (isCorrect) rec.isResolved = true;
+      }
+
+      state.qRecords[q.id] = rec;
+      syncDataToCloud();
+
+      if (isCorrect) {
+        playTone(600, 0.2, 'sine');
+      } else {
+        playTone(200, 0.3, 'sawtooth');
+      }
+
+      loadQuestion(state.currentQIndex);
+      renderBeyGrid();
+    }
+
+    /* ==========================================================================
+       7. TEACHER PANEL & EXCEL EXPORT (homework-66b86)
+       ========================================================================== */
+    function openSecretModal() {
+      document.getElementById('secretModal').classList.remove('hidden');
+    }
+
+    function closeSecretModal() {
+      document.getElementById('secretModal').classList.add('hidden');
+    }
+
+    function verifyTeacherPassword() {
+      const pwd = document.getElementById('teacherPassword').value;
+      if (pwd === 'LKM') {
+        teacherUnlocked = true;
+        document.getElementById('teacherLockScreen').classList.add('hidden');
+        document.getElementById('teacherDashboard').classList.remove('hidden');
+        loadAllStudentData();
+      } else {
+        alert("密碼錯誤！無法進入管理面板。");
+      }
+    }
+
+    async function loadAllStudentData() {
+      if (!db) return;
+      const colRef = window.FirebaseSDK.collection(db, 'artifacts', APP_ID, 'public', 'data', 'students');
+      
+      try {
+        const snap = await window.FirebaseSDK.getDocs(colRef);
+        renderTeacherTable(snap);
+      } catch(e) {
+        console.error("Error fetching student records:", e);
+      }
+    }
+
+    let currentStudentDocs = [];
+
+    function renderTeacherTable(snapshot) {
+      const tbody = document.getElementById('teacherTableBody');
+      tbody.innerHTML = '';
+      currentStudentDocs = [];
+
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        currentStudentDocs.push(d);
+
+        // Count first attempt correct vs current resolved
+        let firstCorrect = 0;
+        let finalCorrect = 0;
+
+        const recs = d.qRecords || {};
+        Object.keys(recs).forEach(qId => {
+          if (recs[qId].isFirstCorrect) firstCorrect++;
+          if (recs[qId].isResolved) finalCorrect++;
+        });
+
+        // Format Q1..Q12 details string
+        let detailStr = QUESTIONS.map(q => {
+          const r = recs[q.id];
+          if (!r) return `Q${q.id}:-`;
+          return `Q${q.id}:${r.firstAttempt}(${r.isFirstCorrect ? '✓' : '✗'})`;
+        }).join(' | ');
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-900/50";
+        tr.innerHTML = `
+          <td class="p-2 font-bold text-cyan-300">${d.userClass || '-'}</td>
+          <td class="p-2">${d.userNo || '-'}</td>
+          <td class="p-2 text-emerald-400 font-bold">${firstCorrect} / 12</td>
+          <td class="p-2 text-blue-400 font-bold">${finalCorrect} / 12</td>
+          <td class="p-2 text-amber-300">${d.wins || 0} 局</td>
+          <td class="p-2 text-[10px] text-slate-400">${detailStr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportToExcel() {
+      if (currentStudentDocs.length === 0) {
+        alert("目前尚無學生答題記錄可供匯出！");
+        return;
+      }
+
+      // Format Sheet Data
+      const excelRows = currentStudentDocs.map(s => {
+        const row = {
+          "班別": s.userClass || '',
+          "學號": s.userNo || '',
+          "通關勝局數": s.wins || 0
+        };
+
+        QUESTIONS.forEach(q => {
+          const rec = (s.qRecords || {})[q.id];
+          row[`第${q.id}題_完整題目`] = q.question;
+          row[`第${q.id}題_首答選擇`] = rec ? rec.firstAttempt : '未答';
+          row[`第${q.id}題_首答是否正確`] = rec ? (rec.isFirstCorrect ? '正確' : '錯誤') : '未答';
+          row[`第${q.id}題_最終答對狀態`] = rec ? (rec.isResolved ? '已補答對' : '未對') : '未答';
+          row[`第${q.id}題_知識層面`] = q.dimension;
+          row[`第${q.id}題_誤因分析`] = q.reason;
+        });
+
+        return row;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "學生作答數據分析");
+
+      // Export filename strictly as specified
+      XLSX.writeFile(workbook, "homework-66b86.xlsx");
+    }
+
+    /* Initialize app on load */
+    window.onload = function() {
+      initFirebase();
+    };
+  </script>
+</body>
+</html>
